@@ -131,6 +131,23 @@ read interface_wlan
 show_msg "Enter the desired Access Point name or press ENTER to use the default one ($SSID):"
 read ssid
 [[ "$ssid" ]] && SSID="$ssid"
+# Broadcast SSID
+show_msg "Choose the SSID broadcast behavior (default: broadcast): "
+broadcast_options=("Broadcast", "Hide")
+select broadcast_option in "${broadcast_options[@]}";
+do
+    case $broadcast_option in
+        1)
+            BROADCAST_SSID=0
+        ;;
+        *)
+	    BROADCAST_SSID=1
+        ;;
+	
+    esac
+    break
+done
+[[ "$ssid" ]] && SSID="$ssid"
 # WPA Passphrase
 show_msg "Enter the desired WPA Passphrase below or press ENTER to use the default one ($WPAPASS):"
 read wpapass
@@ -147,7 +164,7 @@ hw_mode=g
 channel=1
 macaddr_acl=0
 auth_algs=1
-ignore_broadcast_ssid=0
+ignore_broadcast_ssid=$BROADCAST_SSID
 wpa=2
 wpa_passphrase=$WPAPASS
 wpa_key_mgmt=WPA-PSK
@@ -228,6 +245,11 @@ fi
 stop() {
 # Check root
 check_root
+# Check if the hotspot is active
+if [[ -z $(ifconfig | grep "mon.$INTERFACE_WLAN") ]]; then
+	show_info "Wireless Hotspot is not active"
+	exit 1
+fi
 # Get variables
 get_vars
 # Kill process
@@ -247,10 +269,7 @@ sysctl net.ipv4.ip_forward=0 2>&1 | show_debug
 service hostapd stop 2>&1 | show_debug
 service dnsmasq stop 2>&1 | show_debug
 # Restart WiFi and disable newly created mon.WLAN network
-if [[ ! -z $(ifconfig | grep "mon.$INTERFACE_WLAN") ]]; then
-# Check if the hotspot is active
-	ifconfig "mon.$INTERFACE_WLAN" down
-fi
+ifconfig "mon.$INTERFACE_WLAN" down
 ifconfig "$INTERFACE_WLAN" down
 ifconfig "$INTERFACE_WLAN" up
 }
